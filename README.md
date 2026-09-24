@@ -18,6 +18,7 @@ The [`examples/`](examples/) directory contains a complete sample incident:
 ```mermaid
 flowchart TD
     A[main.py] --> B[scraper_x.py<br/>Apify X post collection]
+    Q[config/search_terms.json] --> B
     B --> C[data/latest_x_posts.json]
     B --> D[.seen_tweets.json]
     C --> E[brain.py<br/>local filter and Gemini analysis]
@@ -49,6 +50,26 @@ cp .env.example .env
 
 Populate `.env` with your API keys and Telegram chat ID. Do not commit this file.
 
+## Configure X search terms
+
+Edit [`config/search_terms.json`](config/search_terms.json) to define the tracked search terms used by normal pipeline runs:
+
+```json
+{
+  "search_terms": [
+    "(BTC OR USDT OR ETH) (from:CertiKAlert)"
+  ]
+}
+```
+
+For a one-time run, override the configuration without editing the file:
+
+```bash
+python main.py --search-term "(BTC OR USDT OR ETH) (from:zachxbt)"
+```
+
+Repeat `--search-term` to pass multiple queries. Search terms are not secrets, so the default configuration is stored in Git.
+
 ## Run the pipeline
 
 ```bash
@@ -77,7 +98,7 @@ The project is configured for low-cost or free API usage. Provider quotas, rate 
 
 | Area | Limit or scope in this project | Effect |
 | --- | --- | --- |
-| X collection through Apify | `main.py` requests at most 5 posts per pipeline run. | The pipeline does not attempt to process an unlimited search result set. |
+| X collection through Apify | `main.py` requests at most 10 posts per pipeline run. | The pipeline does not attempt to process an unlimited search result set. |
 | Gemini calls | Gemini is called only when the local filter finds both a security keyword and a complete wallet address. The LLM receives the full normalized post text and author only. | Wallet analysis, Tavily sources, linked article content, and previous reports are not sent to Gemini. Gemini availability and request quotas still depend on the selected provider account. |
 | Tavily search | At most 2 addresses are enriched per incident; each search returns at most 5 sources and uses `basic` depth. Results are cached for 7 days. | Popular incidents cannot consume Tavily credits for every extracted address. A direct address-only retry is made only after an empty result. |
 | Ethereum review | Etherscan history retrieval stops at its 10,000-record result window. | The report still includes the current ETH balance and available first/last sent transaction timestamps, then marks the address for manual verification. |

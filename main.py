@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import warnings
@@ -7,7 +8,12 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from scraper_x import DEFAULT_ARCHIVE_FILE, fetch_new_posts
+from scraper_x import (
+    DEFAULT_ARCHIVE_FILE,
+    DEFAULT_SEARCH_TERMS_FILE,
+    fetch_new_posts,
+    load_search_terms,
+)
 from brain import process_message, FILTERED_OUT
 from incident_report import save_incident_report
 from tavily_wallet_search import MAX_SOURCES_PER_SEARCH, search_wallet_cached
@@ -23,7 +29,7 @@ warnings.filterwarnings("ignore")
 logging.captureWarnings(True)
 logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
-MAX_TWEETS_PER_RUN = 10  #Apify limit posts
+MAX_TWEETS_PER_RUN = 10
 FAILED_QUEUE_FILE = Path("failed_analysis_queue.json")
 MAX_TAVILY_SEARCHES_PER_INCIDENT = 2
 TAVILY_SEARCH_DEPTH = "basic"
@@ -115,7 +121,7 @@ def _save_failed_queue(items: list) -> None:
     FAILED_QUEUE_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2))
 
 
-def run_crypto_grapevine_pipeline() -> None:
+def run_crypto_grapevine_pipeline(search_terms=None) -> None:
     print("\n" + "=" * 60)
     print("🚀 [PIPELINE] Starting Web3 OSINT scan...")
     print("=" * 60)
@@ -128,6 +134,7 @@ def run_crypto_grapevine_pipeline() -> None:
         new_posts = fetch_new_posts(
             max_items=MAX_TWEETS_PER_RUN,
             save_to=DEFAULT_ARCHIVE_FILE,
+            search_terms=search_terms,
         )
         print(f"💾 Parsing result saved to {DEFAULT_ARCHIVE_FILE}")
     except Exception as e:
@@ -180,4 +187,11 @@ def run_crypto_grapevine_pipeline() -> None:
 
 
 if __name__ == "__main__":
-    run_crypto_grapevine_pipeline()
+    parser = argparse.ArgumentParser(description="Run the CryptoGrapevine incident-triage pipeline.")
+    parser.add_argument("--search-terms-file", type=Path, default=DEFAULT_SEARCH_TERMS_FILE,
+                        help=f"Search-term JSON file (default: {DEFAULT_SEARCH_TERMS_FILE})")
+    parser.add_argument("--search-term", action="append",
+                        help="Temporary search term override; repeat for multiple terms")
+    args = parser.parse_args()
+    search_terms = args.search_term or load_search_terms(args.search_terms_file)
+    run_crypto_grapevine_pipeline(search_terms=search_terms)

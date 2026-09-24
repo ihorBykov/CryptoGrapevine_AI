@@ -14,11 +14,25 @@ load_dotenv()
 ACTOR_ID = "xquik/x-tweet-scraper"
 STATE_FILE = Path(".seen_tweets.json")
 DEFAULT_ARCHIVE_FILE = Path("data/latest_x_posts.json")
+DEFAULT_SEARCH_TERMS_FILE = Path("config/search_terms.json")
 
 
-SEARCH_TERMS = [
-    "(BTC OR USDT OR ETH) (from:CertiKAlert)",
-]
+def load_search_terms(file_path: Path = DEFAULT_SEARCH_TERMS_FILE) -> List[str]:
+    """Load a non-empty search_terms list from the project configuration."""
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise ValueError(f"Search-term configuration was not found: {file_path}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Search-term configuration is not valid JSON: {file_path}") from error
+
+    terms = payload.get("search_terms") if isinstance(payload, dict) else None
+    if not isinstance(terms, list):
+        raise ValueError("Search-term configuration must contain a search_terms list.")
+    normalized_terms = [term.strip() for term in terms if isinstance(term, str) and term.strip()]
+    if not normalized_terms:
+        raise ValueError("Search-term configuration must contain at least one non-empty term.")
+    return normalized_terms
 
 
 def _first_text(*values: object) -> Optional[str]:
@@ -101,13 +115,17 @@ def fetch_new_posts(
     *,
     mark_seen: bool = True,
     save_to: Optional[Path] = DEFAULT_ARCHIVE_FILE,
+    search_terms: Optional[List[str]] = None,
 ) -> List[Dict[str, str]]:
     """Fetch new posts and optionally archive the normalized result as JSON."""
     client = ApifyClient(os.environ["APIFY_TOKEN"])
+    terms = search_terms if search_terms is not None else load_search_terms()
+    if not terms:
+        raise ValueError("At least one search term is required.")
 
     run = client.actor(ACTOR_ID).call(
         run_input={
-            "searchTerms": SEARCH_TERMS,
+            "searchTerms": terms,
             "maxItems": max_items,
             "sort": "Latest",
             "tweetLanguage": "en",
@@ -152,16 +170,22 @@ if __name__ == "__main__":
                         help=f"Archive path after --fetch (default: {DEFAULT_ARCHIVE_FILE})")
     parser.add_argument("--mark-seen", action="store_true",
                         help="Record fetched posts in .seen_tweets.json; main.py already does this")
+    parser.add_argument("--search-terms-file", type=Path, default=DEFAULT_SEARCH_TERMS_FILE,
+                        help=f"Search-term JSON file (default: {DEFAULT_SEARCH_TERMS_FILE})")
+    parser.add_argument("--search-term", action="append",
+                        help="Temporary search term override; repeat for multiple terms")
     args = parser.parse_args()
 
     if args.input:
         posts = load_posts(args.input)
         print(f"📂 Loaded {len(posts)} posts from {args.input}; Apify was not called.")
     else:
+        search_terms = args.search_term or load_search_terms(args.search_terms_file)
         posts = fetch_new_posts(
             max_items=args.max_items,
             mark_seen=args.mark_seen,
             save_to=args.output,
+            search_terms=search_terms,
         )
         print(f"💾 Saved {len(posts)} posts to {args.output}")
 

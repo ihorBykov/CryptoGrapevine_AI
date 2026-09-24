@@ -8,11 +8,21 @@ source venv/bin/activate
 
 ## X / Apify
 
+Normal collection reads the tracked terms from `config/search_terms.json`. Change this file to update the default query used by `main.py` and `scraper_x.py`.
+
 Fetch new posts and save the normalized result as JSON:
 
 ```bash
 python scraper_x.py --fetch --max-items 5 --output data/x_posts.json
 ```
+
+Temporarily override the configured query without modifying the file:
+
+```bash
+python scraper_x.py --fetch --max-items 5 --search-term "(BTC OR USDT OR ETH) (from:zachxbt)"
+```
+
+Repeat `--search-term` to use multiple queries. `main.py` accepts the same override.
 
 By default, an independent run does not update `.seen_tweets.json`, so the experiment does not affect the next `main.py` run. Add `--mark-seen` to update this file explicitly.
 
