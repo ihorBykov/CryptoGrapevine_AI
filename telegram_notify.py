@@ -1,3 +1,4 @@
+from html import escape
 import os
 from pathlib import Path
 import requests
@@ -8,6 +9,10 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+
+def _escape_html(value) -> str:
+    return escape(str(value if value is not None else "Unknown"), quote=True)
 
 
 def send_telegram_message(text: str) -> None:
@@ -29,8 +34,8 @@ def send_telegram_message(text: str) -> None:
             timeout=10,
         )
         resp.raise_for_status()
-    except Exception as e:
-        print(f"❌ Telegram message delivery failed: {e}")
+    except Exception as error:
+        print(f"❌ Telegram message delivery failed ({type(error).__name__}).")
 
 
 def send_telegram_document(file_path: Path) -> None:
@@ -50,7 +55,7 @@ def send_telegram_document(file_path: Path) -> None:
             )
         response.raise_for_status()
     except Exception as error:
-        print(f"❌ Telegram report delivery failed: {error}")
+        print(f"❌ Telegram report delivery failed ({type(error).__name__}).")
 
 
 def format_incident_message(
@@ -60,7 +65,8 @@ def format_incident_message(
     include_wallet_details: bool = True,
 ) -> str:
     addresses = "\n".join(
-        f"• <code>{a.address}</code> ({a.blockchain}, Role: {a.role})"
+        f"• <code>{_escape_html(a.address)}</code> "
+        f"({_escape_html(a.blockchain)}, Role: {_escape_html(a.role)})"
         for a in report.extracted_addresses
     ) or "—"
 
@@ -73,24 +79,30 @@ def format_incident_message(
             for w in wallet_reviews:
                 if w.error:
                     icon = "🏦" if w.is_exchange_like else "🔸"
-                    blocks.append(f"{icon} <code>{w.address}</code> ({w.blockchain}): {w.error}")
+                    blocks.append(
+                        f"{icon} <code>{_escape_html(w.address)}</code> "
+                        f"({_escape_html(w.blockchain)}): {_escape_html(w.error)}"
+                    )
                 else:
-                    blocks.append(f"🔸 <code>{w.address}</code> ({w.blockchain}):\n{w.details}")
+                    blocks.append(
+                        f"🔸 <code>{_escape_html(w.address)}</code> "
+                        f"({_escape_html(w.blockchain)}):\n{_escape_html(w.details)}"
+                    )
             wallet_info = "\n\n<b>Wallet review:</b>\n" + "\n\n".join(blocks)
         else:
             wallet_info = "\n\n<b>Wallet review and Tavily sources:</b> see the attached report."
 
     return (
         f"🚨 <b>Incident detected</b>\n\n"
-        f"<b>Type:</b> {report.incident_type or 'Unknown'}\n"
-        f"<b>Classification confidence:</b> {report.classification_confidence}\n"
-        f"<b>Event verification:</b> {VERIFICATION_LABELS.get(report.event_verification, report.event_verification)}\n"
-        f"<b>Victim:</b> {report.victim or 'Unknown'}\n"
+        f"<b>Type:</b> {_escape_html(report.incident_type)}\n"
+        f"<b>Classification confidence:</b> {_escape_html(report.classification_confidence)}\n"
+        f"<b>Event verification:</b> {_escape_html(VERIFICATION_LABELS.get(report.event_verification, report.event_verification))}\n"
+        f"<b>Victim:</b> {_escape_html(report.victim)}\n"
         f"<b>Reported loss:</b> {loss}\n\n"
         f"<b>Addresses:</b>\n{addresses}"
         f"{wallet_info}\n\n"
-        f"<b>Summary:</b> {report.summary_en}\n\n"
-        f"👤 Source: @{post.get('author')}\n"
-        f"📅 Post date: {post.get('created_at')}\n"
-        f"🔗 {post.get('url')}"
+        f"<b>Summary:</b> {_escape_html(report.summary_en)}\n\n"
+        f"👤 Source: @{_escape_html(post.get('author'))}\n"
+        f"📅 Post date: {_escape_html(post.get('created_at'))}\n"
+        f"🔗 {_escape_html(post.get('url'))}"
     )

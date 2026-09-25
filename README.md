@@ -41,8 +41,10 @@ flowchart TD
 
 ## Setup
 
+Use Python 3.11 or later. Python 3.9 has reached end of life and must not be used for a deployed pipeline.
+
 ```bash
-python3 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
