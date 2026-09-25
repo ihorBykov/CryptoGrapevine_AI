@@ -1,4 +1,4 @@
-apify-client==1.12.2
+apify-client==3.2.0
 google-genai==1.47.0
 pydantic==2.13.5
 python-dotenv==1.2.2
