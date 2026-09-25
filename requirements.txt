@@ -1,5 +1,5 @@
 apify-client==1.12.2
-google-genai==1.47.0
+google-genai==2.24.0
 pydantic==2.13.5
 python-dotenv==1.2.2
 requests==2.33.0
